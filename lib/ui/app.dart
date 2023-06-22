@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:netduino_upc_app/ui/anim/introFull_app.dart';
+// import 'package:netduino_upc_app/ui/anim/introFull_app.dart';
 import 'package:netduino_upc_app/ui/auth/login.dart';
 import 'package:netduino_upc_app/ui/auth/perfil.dart';
 import 'package:netduino_upc_app/ui/auth/register.dart';
@@ -17,7 +17,7 @@ class App extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'NetduinoUPC App',
       theme: ThemeData.dark(),
-      initialRoute: '/login',
+      initialRoute: '/principal',
       routes: {
         // "/": (context) => const IntroSimple(),
         //"/": (context) => const IntroFull(),

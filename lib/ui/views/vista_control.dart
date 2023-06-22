@@ -1,6 +1,8 @@
-// ignore_for_file: prefer_const_constructors, prefer_const_literals_to_create_immutables
-
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+import 'package:netduino_upc_app/domain/controller/controllerPerfilUser.dart';
+import 'package:netduino_upc_app/domain/controller/controllerUserFirebase.dart';
+import 'package:wifi_scan/wifi_scan.dart';
 
 class VistaControl extends StatefulWidget {
   const VistaControl({super.key});
@@ -10,37 +12,388 @@ class VistaControl extends StatefulWidget {
 }
 
 class _VistaControlState extends State<VistaControl> {
-  bool _visibleUp = false;
-  bool _visibleDown = false;
+  // VARIABLES DE WIFI
+  bool connectedToArduino = false;
+  String wifiName = '';
+  int wifiSignalStrength = 0;
+  // VARIABLES DE ASCENSOR
+  bool _isLoading = false;
+  bool _isActive = false;
+  bool _visbleUp = false;
+  bool _visbleDown = false;
   int pisoActual = 1;
-  int pisoDestino = 1;
+  String textoPantalla = "Piso 1";
+  //CONTROLADORES
+  ControlUserAuth controlua = Get.find();
+  ControlUserPerfil controlPerfil = ControlUserPerfil();
+  //late TextEditingController _montoInicialController;
+  //Listas
+  //Funciones
 
-  void _compararpiso(int piso) {
-    if (piso > pisoActual) {
-      setState(() {
-        _visibleUp = true;
-        _visibleDown = false;
-        pisoDestino = piso;
-      });
-    } else if (piso < pisoActual) {
-      setState(() {
-        _visibleUp = false;
-        _visibleDown = true;
-        pisoDestino = piso;
-      });
+  void accionBajar(int piso) {
+    setState(() {
+      if (pisoActual > piso) {
+        _visbleUp = false;
+        _visbleDown = true;
+        pisoActual = pisoActual - 1;
+      } else if (pisoActual == piso) {
+        _visbleUp = false;
+        _visbleDown = false;
+        pisoActual = piso - 1;
+      }
+    });
+    if (pisoActual == piso - 1) {
+      pisoActual = piso;
     } else {
-      setState(() {
-        _visibleUp = false;
-        _visibleDown = false;
-        pisoDestino = piso;
+      Future.delayed(const Duration(seconds: 1), () {
+        setState(() {
+          textoPantalla = " Piso $pisoActual ";
+          accionBajar(piso);
+        });
       });
     }
+  }
+
+  void accionSubir(int piso) {
+    setState(() {
+      if (pisoActual < piso) {
+        _visbleUp = true;
+        _visbleDown = false;
+        //print(pisoActual);
+        // print("Subiendo");
+        pisoActual = pisoActual + 1;
+        //print(pisoActual);
+      } else if (pisoActual == piso) {
+        //print("LLego al destino");
+        _visbleUp = false;
+        _visbleDown = false;
+        pisoActual = piso + 1;
+      }
+    });
+    if (pisoActual == piso + 1) {
+      //print("Fin de la accion");
+      pisoActual = piso;
+      //print(pisoActual);
+      //pisoActual = piso-1;
+    } else {
+      Future.delayed(const Duration(seconds: 1), () {
+        setState(() {
+          textoPantalla = " Piso $pisoActual ";
+          accionSubir(piso);
+        });
+      });
+    }
+  }
+
+  void _compararpiso(int piso) {
+    if (pisoActual > piso) {
+      accionBajar(piso);
+    } else if (pisoActual < piso) {
+      accionSubir(piso);
+    }
+  }
+
+  void scanWiFiNetworks() async {
+    WiFiScan wifiScan = WiFiScan.instance;
+    CanStartScan canStartScan = await wifiScan.canStartScan();
+    if (canStartScan == CanStartScan.yes) {
+      bool isSuccess = await wifiScan.startScan();
+      if (isSuccess) {
+        List<WiFiAccessPoint> scannedResults =
+            await wifiScan.getScannedResults();
+        // Utiliza la lista de resultados escaneados
+        for (WiFiAccessPoint accessPoint in scannedResults) {
+          print('SSID: ${accessPoint.ssid}');
+          print('BSSID: ${accessPoint.bssid}');
+          print('Signal Level: ${accessPoint.frequency}');
+          print('------------------------');
+        }
+      } else {
+        print('El escaneo no se pudo iniciar.');
+      }
+    } else {
+      print('No se pueden iniciar los escaneos de WiFi.');
+    }
+  }
+
+  void _encenderWifi() {
+    setState(() {
+      _isActive = !_isActive;
+    });
+  }
+
+  @override
+  void initState() {
+    super.initState();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      endDrawer: Drawer(
+        child: ListView(
+          padding: EdgeInsets.zero,
+          children: [
+            DrawerHeader(
+              decoration: BoxDecoration(
+                color: Color.fromARGB(255, 89, 217, 217),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Icon(
+                    _isActive
+                        ? Icons.wifi
+                        : Icons
+                            .wifi_off, // Utiliza el ícono correspondiente según el estado del Wi-Fi
+                    size: 64,
+                    color: Colors.white,
+                  ),
+                  SizedBox(height: 8),
+                  Text(
+                    // '$wifiName'
+                    'Modulo Wi-Fi',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 20,
+                    ),
+                  ),
+                  SizedBox(height: 8),
+                  Expanded(
+                    child: Container(
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(
+                            10.0), // Ajusta el valor según tus necesidades
+                        color: Color.fromARGB(255, 43, 40,
+                            40), // Elige el color de fondo de tu Row
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Container(
+                            width: 100,
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              _isActive ? 'Activado' : 'Desactivado',
+                              style: TextStyle(
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                          Container(
+                            alignment: Alignment.centerRight,
+                            child: Row(
+                              children: [
+                                Visibility(
+                                  visible: _isLoading,
+                                  child: Padding(
+                                    padding: EdgeInsets.only(right: 10.0),
+                                    child: SizedBox(
+                                      width:
+                                          12.0, // Cambia el tamaño según tus necesidades
+                                      height:
+                                          12.0, // Cambia el tamaño según tus necesidades
+                                      child: CircularProgressIndicator(
+                                        valueColor:
+                                            AlwaysStoppedAnimation<Color>(Colors
+                                                .blue), // Cambia el color según tus necesidades
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                Switch(
+                                  value: _isActive,
+                                  onChanged: (bool value) {
+                                    setState(() {
+                                      _isLoading =
+                                          true; // Mostrar el spinner de carga al cambiar el valor del switch
+                                    });
+                                    _encenderWifi();
+                                    // Simular una espera de 5 segundos antes de ocultar el spinner de carga
+                                    if (_isActive) {
+                                      scanWiFiNetworks();
+                                      Future.delayed(
+                                        Duration(seconds: 5),
+                                        () {
+                                          setState(() {
+                                            _isLoading = false;
+                                          });
+                                        },
+                                      );
+                                    } else {
+                                      setState(() {
+                                        _isLoading = false;
+                                      });
+                                    }
+                                  },
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              padding: EdgeInsets.only(left: 10, right: 10),
+              child: _isActive
+                  ? Column(
+                      children: [
+                        Column(
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    'Red Actual',
+                                    textAlign: TextAlign.left,
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.black,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            Container(
+                              padding: EdgeInsets.only(left: 10, right: 10),
+                              child: Column(
+                                children: [
+                                  ExpansionTile(
+                                    leading: Icon(Icons.wifi),
+                                    title: Text('Red 1'),
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Expanded(
+                                            child: TextButton(
+                                              child: Text(
+                                                'Olvidar red',
+                                                style: TextStyle(
+                                                  color: Colors.red,
+                                                ),
+                                              ),
+                                              onPressed: () {
+                                                // Lógica para olvidar la red
+                                              },
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        Column(
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    'Redes Disponibles',
+                                    textAlign: TextAlign.left,
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.black,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            // Lista de redes disponibles
+                            Container(
+                              padding: EdgeInsets.only(left: 10, right: 10),
+                              child: Column(
+                                children: [
+                                  ExpansionTile(
+                                    leading: Icon(Icons.wifi),
+                                    title: Text('Red 1'),
+                                    children: [
+                                      Padding(
+                                        padding: EdgeInsets.symmetric(
+                                            horizontal: 16),
+                                        child: Row(
+                                          children: [
+                                            Expanded(
+                                              child: TextFormField(
+                                                obscureText:
+                                                    true, // Mostrar el texto como contraseña
+                                                decoration: InputDecoration(
+                                                  labelText: 'Contraseña',
+                                                ),
+                                              ),
+                                            ),
+                                            SizedBox(
+                                              width: 90, // Ancho fijo del botón
+                                              child: ElevatedButton(
+                                                onPressed: () {
+                                                  // Lógica para conectar a la red
+                                                },
+                                                child: Text(
+                                                  'Conectar',
+                                                  style:
+                                                      TextStyle(fontSize: 14),
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    )
+                  : Container(
+                      padding: EdgeInsets.only(top: 50),
+                      alignment: Alignment.center,
+                      child: Column(
+                        children: [
+                          Icon(Icons.help_outline, size: 64),
+                          SizedBox(height: 8),
+                          Text(
+                            'Activa el Wi-Fi para ver las redes disponibles',
+                            style: TextStyle(
+                              color: Colors.black,
+                              fontSize: 20,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
+                      ),
+                    ),
+            ),
+          ],
+        ),
+      ),
       appBar: AppBar(
+        leading: CircleAvatar(
+          backgroundImage: AssetImage('assets/images/NetduinoUPC_logo.png'),
+          backgroundColor: Colors.black,
+          radius: 20.0,
+        ),
+        actions: [
+          Builder(
+            builder: (BuildContext context) {
+              return IconButton(
+                icon: Icon(Icons.settings),
+                onPressed: () => Scaffold.of(context).openEndDrawer(),
+                tooltip: MaterialLocalizations.of(context).openAppDrawerTooltip,
+              );
+            },
+          ),
+        ],
         title: Center(
           child: Column(
             children: [
@@ -57,15 +410,6 @@ class _VistaControlState extends State<VistaControl> {
             ],
           ),
         ),
-        actions: [
-          IconButton(
-            icon: Icon(Icons.settings),
-            onPressed: () {
-              //Navigator.pushNamed(context, '/acerca');
-            },
-            splashColor: Colors.white,
-          ),
-        ],
         backgroundColor: Color.fromARGB(255, 89, 217, 217),
       ),
       body: Container(
@@ -112,7 +456,7 @@ class _VistaControlState extends State<VistaControl> {
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Visibility(
-                                visible: _visibleUp,
+                                visible: _visbleUp,
                                 child: Image.asset(
                                   "assets/images/arrow_up.gif",
                                   width: 50,
@@ -120,7 +464,7 @@ class _VistaControlState extends State<VistaControl> {
                                 ),
                               ),
                               Text(
-                                'Piso 1',
+                                textoPantalla,
                                 style: TextStyle(
                                   fontSize: 40.0,
                                   fontFamily: 'LCD',
@@ -128,7 +472,7 @@ class _VistaControlState extends State<VistaControl> {
                                 ),
                               ),
                               Visibility(
-                                visible: _visibleDown,
+                                visible: _visbleDown,
                                 child: Image.asset(
                                   "assets/images/arrow_down.gif",
                                   width: 50,
