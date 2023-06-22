@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:netduino_upc_app/domain/controller/controllerPerfilUser.dart';
 import 'package:netduino_upc_app/domain/controller/controllerUserFirebase.dart';
 import 'package:wifi_scan/wifi_scan.dart';
+import 'package:network_info_plus/network_info_plus.dart';
 
 class VistaControl extends StatefulWidget {
   const VistaControl({super.key});
@@ -13,9 +14,10 @@ class VistaControl extends StatefulWidget {
 
 class _VistaControlState extends State<VistaControl> {
   // VARIABLES DE WIFI
+  String _wifiName = 'Unknown';
+  final NetworkInfo _networkInfo = NetworkInfo();
+  List<Map<String, dynamic>> _wifiNetworks = [];
   bool connectedToArduino = false;
-  String wifiName = '';
-  int wifiSignalStrength = 0;
   // VARIABLES DE ASCENSOR
   bool _isLoading = false;
   bool _isActive = false;
@@ -93,6 +95,14 @@ class _VistaControlState extends State<VistaControl> {
     }
   }
 
+  void obtenerRedActual() async {
+    String? wifiName;
+    wifiName = await _networkInfo.getWifiName();
+    setState(() {
+      _wifiName = '$wifiName';
+    });
+  }
+
   void scanWiFiNetworks() async {
     WiFiScan wifiScan = WiFiScan.instance;
     CanStartScan canStartScan = await wifiScan.canStartScan();
@@ -107,6 +117,13 @@ class _VistaControlState extends State<VistaControl> {
           print('BSSID: ${accessPoint.bssid}');
           print('Signal Level: ${accessPoint.frequency}');
           print('------------------------');
+          _wifiNetworks.add(
+            {
+              'Nombre: ': accessPoint.ssid,
+              'id de red: ': accessPoint.bssid,
+              'nivel de señal: ': accessPoint.frequency,
+            },
+          );
         }
       } else {
         print('El escaneo no se pudo iniciar.');
@@ -212,6 +229,7 @@ class _VistaControlState extends State<VistaControl> {
                                     _encenderWifi();
                                     // Simular una espera de 5 segundos antes de ocultar el spinner de carga
                                     if (_isActive) {
+                                      obtenerRedActual();
                                       scanWiFiNetworks();
                                       Future.delayed(
                                         Duration(seconds: 5),
@@ -259,13 +277,14 @@ class _VistaControlState extends State<VistaControl> {
                                 ),
                               ],
                             ),
+                            // Red con conexion actual
                             Container(
                               padding: EdgeInsets.only(left: 10, right: 10),
                               child: Column(
                                 children: [
                                   ExpansionTile(
                                     leading: Icon(Icons.wifi),
-                                    title: Text('Red 1'),
+                                    title: Text('$_wifiName'),
                                     children: [
                                       Row(
                                         children: [
@@ -312,41 +331,27 @@ class _VistaControlState extends State<VistaControl> {
                               padding: EdgeInsets.only(left: 10, right: 10),
                               child: Column(
                                 children: [
-                                  ExpansionTile(
-                                    leading: Icon(Icons.wifi),
-                                    title: Text('Red 1'),
-                                    children: [
-                                      Padding(
-                                        padding: EdgeInsets.symmetric(
-                                            horizontal: 16),
-                                        child: Row(
-                                          children: [
-                                            Expanded(
-                                              child: TextFormField(
-                                                obscureText:
-                                                    true, // Mostrar el texto como contraseña
-                                                decoration: InputDecoration(
-                                                  labelText: 'Contraseña',
-                                                ),
-                                              ),
-                                            ),
-                                            SizedBox(
-                                              width: 90, // Ancho fijo del botón
-                                              child: ElevatedButton(
-                                                onPressed: () {
-                                                  // Lógica para conectar a la red
-                                                },
-                                                child: Text(
-                                                  'Conectar',
-                                                  style:
-                                                      TextStyle(fontSize: 14),
-                                                ),
-                                              ),
-                                            ),
-                                          ],
+                                  ListView.builder(
+                                    shrinkWrap: true,
+                                    itemCount: _wifiNetworks.length,
+                                    itemBuilder: (context, index) {
+                                      var network = _wifiNetworks[index];
+                                      return ListTile(
+                                        leading: Icon(Icons.wifi),
+                                        title: Text(network['Nombre: ']),
+                                        subtitle: Text(
+                                            'ID de red: ${network['id de red: ']}'),
+                                        trailing: ElevatedButton(
+                                          onPressed: () {
+                                            // Lógica para conectar a la red
+                                          },
+                                          child: Text(
+                                            'Conectar',
+                                            style: TextStyle(fontSize: 14),
+                                          ),
                                         ),
-                                      ),
-                                    ],
+                                      );
+                                    },
                                   ),
                                 ],
                               ),
