@@ -47,6 +47,8 @@ dependencies:
   firebase_storage: ^11.2.3
   wifi_scan: ^0.4.0+1
   network_info_plus: ^3.0.5
+  audioplayers: ^4.1.0
+  just_audio: ^0.9.34
 
 dev_dependencies:
   flutter_test:

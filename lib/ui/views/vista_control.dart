@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:netduino_upc_app/domain/controller/controllerPerfilUser.dart';
 import 'package:netduino_upc_app/domain/controller/controllerUserFirebase.dart';
+import 'package:audioplayers/audioplayers.dart';
 import 'package:wifi_scan/wifi_scan.dart';
 import 'package:network_info_plus/network_info_plus.dart';
 
@@ -13,6 +14,8 @@ class VistaControl extends StatefulWidget {
 }
 
 class _VistaControlState extends State<VistaControl> {
+  // VARIABLES DE AUDIO
+  AudioPlayer audioPlayer = AudioPlayer();
   // VARIABLES DE WIFI
   String _wifiName = 'Unknown';
   final NetworkInfo _networkInfo = NetworkInfo();
@@ -29,8 +32,13 @@ class _VistaControlState extends State<VistaControl> {
   ControlUserAuth controlua = Get.find();
   ControlUserPerfil controlPerfil = ControlUserPerfil();
   //late TextEditingController _montoInicialController;
-  //Listas
   //Funciones
+  void sonidoAscensorBajando() {
+    String audioPath = 'sounds/down.mp3';
+    audioPlayer.play(AssetSource(audioPath));
+    String melodyPath = 'sounds/wait_floor_calabria.mp3';
+    audioPlayer.play(AssetSource(melodyPath));
+  }
 
   void accionBajar(int piso) {
     setState(() {
@@ -42,6 +50,9 @@ class _VistaControlState extends State<VistaControl> {
         _visbleUp = false;
         _visbleDown = false;
         pisoActual = piso - 1;
+        // Reproducir el audio
+        String audioPath = 'sounds/arrived.mp3';
+        audioPlayer.play(AssetSource(audioPath));
       }
     });
     if (pisoActual == piso - 1) {
@@ -54,6 +65,13 @@ class _VistaControlState extends State<VistaControl> {
         });
       });
     }
+  }
+
+  void sonidoAscensorSubiendo() {
+    String audioPath = 'sounds/up.mp3';
+    audioPlayer.play(AssetSource(audioPath));
+    String melodyPath = 'sounds/wait_floor_da_da.mp3';
+    audioPlayer.play(AssetSource(melodyPath));
   }
 
   void accionSubir(int piso) {
@@ -70,6 +88,8 @@ class _VistaControlState extends State<VistaControl> {
         _visbleUp = false;
         _visbleDown = false;
         pisoActual = piso + 1;
+        String audioPath = 'sounds/arrived.mp3';
+        audioPlayer.play(AssetSource(audioPath));
       }
     });
     if (pisoActual == piso + 1) {
@@ -78,7 +98,7 @@ class _VistaControlState extends State<VistaControl> {
       //print(pisoActual);
       //pisoActual = piso-1;
     } else {
-      Future.delayed(const Duration(seconds: 1), () {
+      Future.delayed(const Duration(seconds: 2), () {
         setState(() {
           textoPantalla = " Piso $pisoActual ";
           accionSubir(piso);
@@ -89,8 +109,10 @@ class _VistaControlState extends State<VistaControl> {
 
   void _compararpiso(int piso) {
     if (pisoActual > piso) {
+      sonidoAscensorBajando();
       accionBajar(piso);
     } else if (pisoActual < piso) {
+      sonidoAscensorSubiendo();
       accionSubir(piso);
     }
   }
@@ -146,6 +168,19 @@ class _VistaControlState extends State<VistaControl> {
 
   @override
   Widget build(BuildContext context) {
+    // Función para mostrar un aviso
+    void mostrarAviso(BuildContext context) {
+      final snackBar = SnackBar(
+        content: Column(
+          children: [
+            Icon(Icons.audiotrack_rounded, size: 64),
+            Text('Por favor, conecta los audífonos'),
+          ],
+        ),
+      );
+      ScaffoldMessenger.of(context).showSnackBar(snackBar);
+    }
+
     return Scaffold(
       endDrawer: Drawer(
         child: ListView(
@@ -433,14 +468,22 @@ class _VistaControlState extends State<VistaControl> {
                   Column(
                     children: [
                       Container(
-                        margin: EdgeInsets.only(top: 20.0),
-                        child: Text(
-                          'Control de elevador',
-                          style: TextStyle(
-                            fontSize: 20.0,
-                            fontWeight: FontWeight.bold,
+                        width: 370.0,
+                        decoration: BoxDecoration(
+                          image: DecorationImage(
+                            image: AssetImage(
+                              "assets/images/placa_banner.png",
+                            ),
+                            fit: BoxFit.fill,
                           ),
                         ),
+                        // child: Text(
+                        //   'Control de elevador',
+                        //   style: TextStyle(
+                        //     fontSize: 20.0,
+                        //     fontWeight: FontWeight.bold,
+                        //   ),
+                        // ),
                       ),
                       SizedBox(
                         height: 10.0,
@@ -471,7 +514,7 @@ class _VistaControlState extends State<VistaControl> {
                               Text(
                                 textoPantalla,
                                 style: TextStyle(
-                                  fontSize: 40.0,
+                                  fontSize: 50.0,
                                   fontFamily: 'LCD',
                                   color: Colors.red[900],
                                 ),
@@ -494,7 +537,11 @@ class _VistaControlState extends State<VistaControl> {
               ),
             ],
           ),
+          SizedBox(
+            height: 20.0,
+          ),
           Column(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -503,11 +550,17 @@ class _VistaControlState extends State<VistaControl> {
                     texto: '1',
                     modo: _compararpiso,
                   ),
+                  SizedBox(
+                    width: 10.0,
+                  ),
                   TecledoButton(
                     texto: '2',
                     modo: _compararpiso,
                   ),
                 ],
+              ),
+              SizedBox(
+                height: 10.0,
               ),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -516,11 +569,17 @@ class _VistaControlState extends State<VistaControl> {
                     texto: '3',
                     modo: _compararpiso,
                   ),
+                  SizedBox(
+                    width: 10.0,
+                  ),
                   TecledoButton(
                     texto: '4',
                     modo: _compararpiso,
                   ),
                 ],
+              ),
+              SizedBox(
+                height: 10.0,
               ),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -528,9 +587,15 @@ class _VistaControlState extends State<VistaControl> {
                   TecledoButton2(
                     modo: 1,
                   ),
+                  SizedBox(
+                    width: 10.0,
+                  ),
                   TecledoButton(
                     texto: '0',
                     modo: _compararpiso,
+                  ),
+                  SizedBox(
+                    width: 10.0,
                   ),
                   TecledoButton2(
                     modo: 2,
