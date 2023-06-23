@@ -48,7 +48,8 @@ dependencies:
   wifi_scan: ^0.4.0+1
   network_info_plus: ^3.0.5
   audioplayers: ^4.1.0
-  just_audio: ^0.9.34
+  permission_handler: ^10.3.0
+  android_flutter_wifi: ^0.1.2
 
 dev_dependencies:
   flutter_test:

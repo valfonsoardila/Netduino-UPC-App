@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-// import 'package:netduino_upc_app/ui/views/vista_prueba.dart';
 import 'package:netduino_upc_app/ui/views/vista_control.dart';
 
 class MainScreen extends StatefulWidget {

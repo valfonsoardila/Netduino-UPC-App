@@ -3,8 +3,10 @@ import 'package:get/get.dart';
 import 'package:netduino_upc_app/domain/controller/controllerPerfilUser.dart';
 import 'package:netduino_upc_app/domain/controller/controllerUserFirebase.dart';
 import 'package:audioplayers/audioplayers.dart';
-import 'package:wifi_scan/wifi_scan.dart';
-import 'package:network_info_plus/network_info_plus.dart';
+// import 'package:wifi_scan/wifi_scan.dart';
+// import 'package:network_info_plus/network_info_plus.dart';
+import 'package:android_flutter_wifi/android_flutter_wifi.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 class VistaControl extends StatefulWidget {
   const VistaControl({super.key});
@@ -16,9 +18,10 @@ class VistaControl extends StatefulWidget {
 class _VistaControlState extends State<VistaControl> {
   // VARIABLES DE AUDIO
   AudioPlayer audioPlayer = AudioPlayer();
+  late PermissionStatus permissionLocation;
   // VARIABLES DE WIFI
   String _wifiName = 'Unknown';
-  final NetworkInfo _networkInfo = NetworkInfo();
+  // final NetworkInfo _networkInfo = NetworkInfo();
   List<Map<String, dynamic>> _wifiNetworks = [];
   bool connectedToArduino = false;
   // VARIABLES DE ASCENSOR
@@ -34,8 +37,8 @@ class _VistaControlState extends State<VistaControl> {
   //late TextEditingController _montoInicialController;
   //Funciones
   void sonidoAscensorBajando() {
-    String audioPath = 'sounds/down.mp3';
-    audioPlayer.play(AssetSource(audioPath));
+    // String audioPath = 'sounds/down.mp3';
+    // audioPlayer.play(AssetSource(audioPath));
     String melodyPath = 'sounds/wait_floor_calabria.mp3';
     audioPlayer.play(AssetSource(melodyPath));
   }
@@ -51,14 +54,14 @@ class _VistaControlState extends State<VistaControl> {
         _visbleDown = false;
         pisoActual = piso - 1;
         // Reproducir el audio
-        String audioPath = 'sounds/arrived.mp3';
+        String audioPath = 'sounds/elevatorDing.mp3';
         audioPlayer.play(AssetSource(audioPath));
       }
     });
     if (pisoActual == piso - 1) {
       pisoActual = piso;
     } else {
-      Future.delayed(const Duration(seconds: 1), () {
+      Future.delayed(const Duration(seconds: 5), () {
         setState(() {
           textoPantalla = " Piso $pisoActual ";
           accionBajar(piso);
@@ -68,8 +71,8 @@ class _VistaControlState extends State<VistaControl> {
   }
 
   void sonidoAscensorSubiendo() {
-    String audioPath = 'sounds/up.mp3';
-    audioPlayer.play(AssetSource(audioPath));
+    // String audioPath = 'sounds/up.mp3';
+    // audioPlayer.play(AssetSource(audioPath));
     String melodyPath = 'sounds/wait_floor_da_da.mp3';
     audioPlayer.play(AssetSource(melodyPath));
   }
@@ -88,7 +91,7 @@ class _VistaControlState extends State<VistaControl> {
         _visbleUp = false;
         _visbleDown = false;
         pisoActual = piso + 1;
-        String audioPath = 'sounds/arrived.mp3';
+        String audioPath = 'sounds/elevatorDing.mp3';
         audioPlayer.play(AssetSource(audioPath));
       }
     });
@@ -98,7 +101,7 @@ class _VistaControlState extends State<VistaControl> {
       //print(pisoActual);
       //pisoActual = piso-1;
     } else {
-      Future.delayed(const Duration(seconds: 2), () {
+      Future.delayed(const Duration(seconds: 5), () {
         setState(() {
           textoPantalla = " Piso $pisoActual ";
           accionSubir(piso);
@@ -107,80 +110,137 @@ class _VistaControlState extends State<VistaControl> {
     }
   }
 
+  void encurso() {
+    String audioPath = 'sounds/elevatorClose.mp3';
+    audioPlayer.play(AssetSource(audioPath));
+  }
+
+  void disponible() {
+    String audioPath = 'sounds/elevatorDing.mp3';
+    audioPlayer.play(AssetSource(audioPath));
+  }
+
   void _compararpiso(int piso) {
     if (pisoActual > piso) {
+      encurso();
       sonidoAscensorBajando();
       accionBajar(piso);
+      //disponible();
     } else if (pisoActual < piso) {
+      encurso();
       sonidoAscensorSubiendo();
       accionSubir(piso);
+      //disponible();
     }
   }
 
-  void obtenerRedActual() async {
-    String? wifiName;
-    wifiName = await _networkInfo.getWifiName();
-    setState(() {
-      _wifiName = '$wifiName';
-    });
-  }
-
-  void scanWiFiNetworks() async {
-    WiFiScan wifiScan = WiFiScan.instance;
-    CanStartScan canStartScan = await wifiScan.canStartScan();
-    if (canStartScan == CanStartScan.yes) {
-      bool isSuccess = await wifiScan.startScan();
-      if (isSuccess) {
-        List<WiFiAccessPoint> scannedResults =
-            await wifiScan.getScannedResults();
-        // Utiliza la lista de resultados escaneados
-        for (WiFiAccessPoint accessPoint in scannedResults) {
-          print('SSID: ${accessPoint.ssid}');
-          print('BSSID: ${accessPoint.bssid}');
-          print('Signal Level: ${accessPoint.frequency}');
-          print('------------------------');
-          _wifiNetworks.add(
-            {
-              'Nombre: ': accessPoint.ssid,
-              'id de red: ': accessPoint.bssid,
-              'nivel de señal: ': accessPoint.frequency,
-            },
-          );
-        }
-      } else {
-        print('El escaneo no se pudo iniciar.');
-      }
+  void obtenerWifiActual() async {
+    print("llego al metodo");
+    ActiveWifiNetwork activeWifiNetwork =
+        await AndroidFlutterWifi.getActiveWifiInfo();
+    _wifiName = activeWifiNetwork.ssid.toString();
+    print('Este es el nombre de la red: $_wifiName');
+    if (_wifiName.isEmpty || _wifiName == '<unknown ssid>') {
+      _wifiName = 'No conectado';
     } else {
-      print('No se pueden iniciar los escaneos de WiFi.');
+      setState(() {
+        _wifiName = activeWifiNetwork.ssid.toString();
+      });
     }
   }
+
+  void escanearWifis() async {
+    permissionLocation = await Permission.location.request();
+    if (permissionLocation.isGranted) {
+      List<WifiNetwork> wifiList = await AndroidFlutterWifi.getWifiScanResult();
+      print('Estas son las redes: $wifiList');
+      if (wifiList.isNotEmpty) {
+        for (WifiNetwork wifiNetwork in wifiList) {
+          Map<String, dynamic> networkData = {
+            'Nombre: ': wifiNetwork.ssid,
+            'Id de red: ': wifiNetwork.bssid,
+            'Nivel de señal: ': wifiNetwork.signalLevel,
+            'Frecuencia: ': wifiNetwork.frequency,
+            'Seguridad: ': wifiNetwork.security,
+            // Agrega más propiedades según tus necesidades
+          };
+          print('Estas son las redes: $networkData');
+          _wifiNetworks.add(networkData);
+        }
+      }
+    }
+  }
+  // void obtenerRedActual() async {
+  //   String? wifiName;
+  //   wifiName = await _networkInfo.getWifiName();
+  //   setState(() {
+  //     if (wifiName == null) {
+  //       _wifiName = 'No conectado';
+  //     } else {
+  //       _wifiName = '$wifiName';
+  //     }
+  //   });
+  // }
+
+  // void scanWiFiNetworks() async {
+  //   WiFiScan wifiScan = WiFiScan.instance;
+  //   CanStartScan canStartScan = await wifiScan.canStartScan();
+  //   if (canStartScan == CanStartScan.yes) {
+  //     bool isSuccess = await wifiScan.startScan();
+  //     if (isSuccess) {
+  //       List<WiFiAccessPoint> scannedResults =
+  //           await wifiScan.getScannedResults();
+  //       // Utiliza la lista de resultados escaneados
+  //       for (WiFiAccessPoint accessPoint in scannedResults) {
+  //         print('SSID: ${accessPoint.ssid}');
+  //         print('BSSID: ${accessPoint.bssid}');
+  //         print('Signal Level: ${accessPoint.frequency}');
+  //         print('------------------------');
+  //         _wifiNetworks.add(
+  //           {
+  //             'Nombre: ': accessPoint.ssid,
+  //             'id de red: ': accessPoint.bssid,
+  //             'nivel de señal: ': accessPoint.frequency,
+  //           },
+  //         );
+  //       }
+  //     } else {
+  //       print('El escaneo no se pudo iniciar.');
+  //     }
+  //   } else {
+  //     print('No se pueden iniciar los escaneos de WiFi.');
+  //   }
+  // }
 
   void _encenderWifi() {
     setState(() {
       _isActive = !_isActive;
     });
+    if (_isActive == true) {
+      AndroidFlutterWifi.enableWifi();
+      print('Wi-Fi encendido');
+      _wifiNetworks.clear();
+    } else {
+      if (_isActive == false) {
+        AndroidFlutterWifi.disableWifi();
+        print('Wi-Fi apagado');
+        _wifiNetworks.clear();
+      }
+    }
+  }
+
+  void inicializarEscaneo() async {
+    await AndroidFlutterWifi.init();
   }
 
   @override
   void initState() {
     super.initState();
+    inicializarEscaneo();
   }
 
   @override
   Widget build(BuildContext context) {
-    // Función para mostrar un aviso
-    void mostrarAviso(BuildContext context) {
-      final snackBar = SnackBar(
-        content: Column(
-          children: [
-            Icon(Icons.audiotrack_rounded, size: 64),
-            Text('Por favor, conecta los audífonos'),
-          ],
-        ),
-      );
-      ScaffoldMessenger.of(context).showSnackBar(snackBar);
-    }
-
     return Scaffold(
       endDrawer: Drawer(
         child: ListView(
@@ -264,8 +324,10 @@ class _VistaControlState extends State<VistaControl> {
                                     _encenderWifi();
                                     // Simular una espera de 5 segundos antes de ocultar el spinner de carga
                                     if (_isActive) {
-                                      obtenerRedActual();
-                                      scanWiFiNetworks();
+                                      obtenerWifiActual();
+                                      escanearWifis();
+                                      // obtenerRedActual();
+                                      // scanWiFiNetworks();
                                       Future.delayed(
                                         Duration(seconds: 5),
                                         () {
@@ -296,55 +358,58 @@ class _VistaControlState extends State<VistaControl> {
               child: _isActive
                   ? Column(
                       children: [
-                        Column(
-                          children: [
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    'Red Actual',
-                                    textAlign: TextAlign.left,
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.black,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            // Red con conexion actual
-                            Container(
-                              padding: EdgeInsets.only(left: 10, right: 10),
-                              child: Column(
+                        _wifiName != 'No conectado' && _wifiName != 'Unknown'
+                            ? Column(
                                 children: [
-                                  ExpansionTile(
-                                    leading: Icon(Icons.wifi),
-                                    title: Text('$_wifiName'),
+                                  Row(
                                     children: [
-                                      Row(
-                                        children: [
-                                          Expanded(
-                                            child: TextButton(
-                                              child: Text(
-                                                'Olvidar red',
-                                                style: TextStyle(
-                                                  color: Colors.red,
-                                                ),
-                                              ),
-                                              onPressed: () {
-                                                // Lógica para olvidar la red
-                                              },
-                                            ),
+                                      Expanded(
+                                        child: Text(
+                                          'Red Actual',
+                                          textAlign: TextAlign.left,
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.black,
                                           ),
-                                        ],
+                                        ),
                                       ),
                                     ],
                                   ),
+                                  // Red con conexion actual
+                                  Container(
+                                    padding:
+                                        EdgeInsets.only(left: 10, right: 10),
+                                    child: Column(
+                                      children: [
+                                        ExpansionTile(
+                                          leading: Icon(Icons.wifi),
+                                          title: Text('$_wifiName'),
+                                          children: [
+                                            Row(
+                                              children: [
+                                                Expanded(
+                                                  child: TextButton(
+                                                    child: Text(
+                                                      'Olvidar red',
+                                                      style: TextStyle(
+                                                        color: Colors.red,
+                                                      ),
+                                                    ),
+                                                    onPressed: () {
+                                                      // Lógica para olvidar la red
+                                                    },
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ),
                                 ],
-                              ),
-                            ),
-                          ],
-                        ),
+                              )
+                            : Container(),
                         Column(
                           children: [
                             Row(
@@ -366,27 +431,31 @@ class _VistaControlState extends State<VistaControl> {
                               padding: EdgeInsets.only(left: 10, right: 10),
                               child: Column(
                                 children: [
-                                  ListView.builder(
-                                    shrinkWrap: true,
-                                    itemCount: _wifiNetworks.length,
-                                    itemBuilder: (context, index) {
-                                      var network = _wifiNetworks[index];
-                                      return ListTile(
-                                        leading: Icon(Icons.wifi),
-                                        title: Text(network['Nombre: ']),
-                                        subtitle: Text(
-                                            'ID de red: ${network['id de red: ']}'),
-                                        trailing: ElevatedButton(
-                                          onPressed: () {
-                                            // Lógica para conectar a la red
-                                          },
-                                          child: Text(
-                                            'Conectar',
-                                            style: TextStyle(fontSize: 14),
-                                          ),
-                                        ),
-                                      );
-                                    },
+                                  SingleChildScrollView(
+                                    child: Container(
+                                      child: ListView.builder(
+                                        shrinkWrap: true,
+                                        itemCount: _wifiNetworks.length,
+                                        itemBuilder: (context, index) {
+                                          var network = _wifiNetworks[index];
+                                          return ListTile(
+                                            leading: Icon(Icons.wifi),
+                                            title: Text(network['Nombre: ']),
+                                            subtitle: Text(
+                                                'Intensidad: ${network['Nivel de señal: ']}'),
+                                            trailing: ElevatedButton(
+                                              onPressed: () {
+                                                // Lógica para conectar a la red
+                                              },
+                                              child: Text(
+                                                'Conectar',
+                                                style: TextStyle(fontSize: 14),
+                                              ),
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                    ),
                                   ),
                                 ],
                               ),
@@ -460,6 +529,9 @@ class _VistaControlState extends State<VistaControl> {
           ),
         ),
         child: Column(children: [
+          SizedBox(
+            height: 10.0,
+          ),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -469,6 +541,8 @@ class _VistaControlState extends State<VistaControl> {
                     children: [
                       Container(
                         width: 370.0,
+                        height: 60.0,
+                        alignment: Alignment.center,
                         decoration: BoxDecoration(
                           image: DecorationImage(
                             image: AssetImage(
@@ -477,13 +551,15 @@ class _VistaControlState extends State<VistaControl> {
                             fit: BoxFit.fill,
                           ),
                         ),
-                        // child: Text(
-                        //   'Control de elevador',
-                        //   style: TextStyle(
-                        //     fontSize: 20.0,
-                        //     fontWeight: FontWeight.bold,
-                        //   ),
-                        // ),
+                        child: Text(
+                          'Control de elevador',
+                          style: TextStyle(
+                            fontSize: 20.0,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.blueGrey[800],
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
                       ),
                       SizedBox(
                         height: 10.0,
@@ -586,6 +662,7 @@ class _VistaControlState extends State<VistaControl> {
                 children: [
                   TecledoButton2(
                     modo: 1,
+                    sound: encurso,
                   ),
                   SizedBox(
                     width: 10.0,
@@ -599,6 +676,7 @@ class _VistaControlState extends State<VistaControl> {
                   ),
                   TecledoButton2(
                     modo: 2,
+                    sound: disponible,
                   ),
                 ],
               ),
@@ -632,7 +710,7 @@ class _TecledoButtonState extends State<TecledoButton> {
       _textColor =
           const Color.fromARGB(255, 89, 217, 217); // Color al ser presionado
       _isButtonDisabled = true; // Desactiva el botón mientras cambia de color
-      widget.modo(int.parse(widget.texto));
+      widget.modo(int.parse(widget.texto)); // Llama a la función
       Future.delayed(const Duration(seconds: 2), () {
         setState(() {
           _buttonColor = const Color.fromARGB(
@@ -703,7 +781,8 @@ class _TecledoButtonState extends State<TecledoButton> {
 
 class TecledoButton2 extends StatefulWidget {
   int modo;
-  TecledoButton2({required this.modo, super.key});
+  dynamic sound;
+  TecledoButton2({required this.modo, required this.sound, super.key});
 
   @override
   _TecledoButton2State createState() => _TecledoButton2State();
@@ -722,7 +801,7 @@ class _TecledoButton2State extends State<TecledoButton2> {
       _iconColor =
           const Color.fromARGB(255, 89, 217, 217); // Color al ser presionado
       _isButtonDisabled = true; // Desactiva el botón mientras cambia de color
-
+      widget.sound(); // Llama a la función
       Future.delayed(const Duration(seconds: 2), () {
         setState(() {
           _buttonColor = const Color.fromARGB(
